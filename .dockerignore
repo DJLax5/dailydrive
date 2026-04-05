@@ -1,0 +1,32 @@
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.git
+.gitignore
+.claude
+.vscode
+dist
+build
+coverage
+logs
+*.log
+
+# Secrets and local state (mount at runtime instead)
+config.yaml
+.env*
+.spotify-token.json
+spotify-token.json
+state.json
+cursors.json
+
+# Docs and images not needed in runtime image
+img
+docs
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~

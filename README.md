@@ -220,6 +220,78 @@ That's it — your Daily Drive is back on autopilot.
 | `npm run taste` | Auto-detect your music genres using AI (Demeterics) |
 | `npm run taste:google` | Auto-detect your music genres using AI (Google Gemini — free) |
 
+## Docker
+
+You can run Daily Drive in a container without changing the code. Secrets stay outside the image and are mounted at runtime.
+
+### Build the image
+
+```bash
+docker build -t dailydrive .
+```
+
+### Prepare your config and token (host files)
+
+- Copy and edit `config.yaml` on your host (not inside the image)
+- Run `npm run setup` once on the host to create `.spotify-token.json` (or run it in a throwaway container with the same mounts)
+
+Keep these files on the host; they are git-ignored and should not be baked into the image.
+
+### Run (dry run)
+
+```bash
+docker run --rm \
+  -v "$PWD/config.yaml:/app/config.yaml:ro" \
+  -v "$PWD/.spotify-token.json:/app/.spotify-token.json" \
+  -v "$PWD/state.json:/app/state.json" \
+  dailydrive npm test
+```
+
+### Run (update playlist)
+
+```bash
+docker run --rm \
+  -v "$PWD/config.yaml:/app/config.yaml:ro" \
+  -v "$PWD/.spotify-token.json:/app/.spotify-token.json" \
+  -v "$PWD/state.json:/app/state.json" \
+  dailydrive npm start
+```
+
+### Run setup inside a container (optional)
+
+If you prefer to do OAuth inside the container (e.g., CI runner), mount a host directory for the token output and forward port 8888:
+
+```bash
+docker run --rm -p 8888:8888 \
+  -v "$PWD/config.yaml:/app/config.yaml:ro" \
+  -v "$PWD:/app" \
+  dailydrive npm run setup
+```
+
+Open the printed URL in your browser; the token will be written to the mounted path.
+
+### Scheduling: inside vs. outside the container
+
+- **Outside (recommended):** Use host cron/systemd to run the container on a schedule. Example cron entry (runs 4 AM/4 PM):
+
+  ```cron
+  0 4,16 * * * cd /home/$USER/dailydrive && \
+    docker run --rm -v "$PWD/config.yaml:/app/config.yaml:ro" \
+    -v "$PWD/.spotify-token.json:/app/.spotify-token.json" \
+    -v "$PWD/state.json:/app/state.json" \
+    dailydrive npm start >> /tmp/dailydrive.log 2>&1
+  ```
+
+  Pros: container only runs while updating (low idle); host controls schedule; logs stay on host. Cons: requires docker + cron on host.
+
+- **Inside:** Add cron/systemd to the image or use `docker run --restart=unless-stopped` with an internal loop. Pros: single artifact that self-schedules. Cons: container stays running (idle resources), harder log shipping, larger image (needs cron). For most users, host scheduling is simpler and lighter.
+
+### Notes
+
+- The image uses `node:18-slim` with `curl` for basic debugging. It runs as a non-root user.
+- `.dockerignore` excludes secrets, git metadata, and dev artifacts to keep the build small.
+- Bare-metal usage is unchanged; docker is optional.
+
 ---
 
 ## Troubleshooting
