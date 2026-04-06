@@ -262,13 +262,31 @@ docker run --rm \
 If you prefer to do OAuth inside the container (e.g., CI runner), mount a host directory for the token output and forward port 8888:
 
 ```bash
+New-Item -ItemType File -Force .spotify-token.json | Out-Null
 docker run --rm -p 8888:8888 \
+  -e SETUP_BIND_HOST=0.0.0.0 \
   -v "$PWD/config.yaml:/app/config.yaml:ro" \
-  -v "$PWD:/app" \
+  -v "$PWD/.spotify-token.json:/app/.spotify-token.json" \
   dailydrive npm run setup
 ```
 
-Open the printed URL in your browser; the token will be written to the mounted path.
+Open the printed URL in your browser; the token will be written to the mounted file.
+If you run from Windows PowerShell, use `${PWD}` in place of `$PWD`.
+
+If Docker Desktop still complains about mounting a single file, mount a small host folder instead and keep `config.yaml`, `.spotify-token.json`, and `state.json` together there.
+
+### Run on Windows with persisted token and state
+
+For the main playlist update, mount both files so the container can refresh the token and save state:
+
+```bash
+New-Item -ItemType File -Force .spotify-token.json, state.json | Out-Null
+docker run --rm \
+  -v "${PWD}\config.yaml:/app/config.yaml:ro" \
+  -v "${PWD}\.spotify-token.json:/app/.spotify-token.json" \
+  -v "${PWD}\state.json:/app/state.json" \
+  dailydrive npm start
+```
 
 ### Scheduling: inside vs. outside the container
 

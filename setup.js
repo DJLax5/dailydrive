@@ -16,10 +16,11 @@ const express = require("express");
 const TOKEN_FILE = ".spotify-token.json";
 const CONFIG_FILE = "config.yaml";
 
-// --- Clear any existing token to force fresh auth ---
+// --- Reuse the token file path if it already exists ---
+// On Windows/Docker Desktop, bind-mounted files can be locked for unlink.
+// We overwrite the file later when auth succeeds, so deletion is unnecessary.
 if (fs.existsSync(TOKEN_FILE)) {
-  fs.unlinkSync(TOKEN_FILE);
-  console.log("🗑️  Deleted old token — starting fresh auth");
+  console.log(`ℹ️  Token file already exists at ${TOKEN_FILE} — it will be overwritten after login`);
 }
 
 // --- Load config ---
@@ -64,6 +65,9 @@ const SCOPES = [
 // --- Start a tiny web server to catch the callback ---
 const app = express();
 const port = new URL(redirect_uri).port || 8888;
+const runningInDocker = fs.existsSync("/.dockerenv");
+const callbackBindHost =
+  process.env.SETUP_BIND_HOST || (runningInDocker ? "0.0.0.0" : "127.0.0.1");
 
 app.get("/callback", async (req, res) => {
   const { code, error } = req.query;
@@ -100,13 +104,18 @@ app.get("/callback", async (req, res) => {
   }
 });
 
-// Bind to 127.0.0.1 explicitly (Spotify requires this, not "localhost")
-app.listen(port, "127.0.0.1", () => {
+// Spotify redirect URI can still be 127.0.0.1 while we bind 0.0.0.0 in Docker
+app.listen(port, callbackBindHost, () => {
   const authUrl = spotifyApi.createAuthorizeURL(SCOPES, "dailydrive");
 
   console.log("\n🎵 Daily Drive — Setup\n");
   console.log("Open this URL in your browser to authorize:\n");
   console.log(`  ${authUrl}\n`);
+  if (runningInDocker && callbackBindHost === "0.0.0.0") {
+    console.log(
+      "Running in Docker: callback server is bound to 0.0.0.0 so published ports can receive Spotify redirects."
+    );
+  }
 
   // Try to open the browser automatically (works on desktop, not headless)
   import("open")
