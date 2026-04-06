@@ -25,8 +25,10 @@ COPY scripts ./scripts
 COPY config.example.yaml ./config.example.yaml
 
 # Create a non-root user and switch
-RUN useradd -m dailydrive
+RUN useradd -m dailydrive \
+  && chown -R dailydrive:dailydrive /app
 USER dailydrive
 
 # Default command: dry-run to show output; override in docker run
 CMD ["npm", "test"]
+
